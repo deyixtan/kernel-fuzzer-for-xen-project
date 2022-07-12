@@ -427,23 +427,20 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    if ( !vmtrace )
+    if ( !harness_cpuid )
     {
-        if ( !harness_cpuid )
+        if ( !start_byte && !vmtrace )
         {
-            if ( !start_byte )
-            {
-                printf("For breakpoint harness --start-byte with a value must be provided (NOP is always a good option, 0x90)\n");
-                return -1;
-            }
-
-            if ( default_magic_mark )
-                magic_mark = 0;
+            printf("For breakpoint harness --start-byte with a value must be provided (NOP is always a good option, 0x90)\n");
+            return -1;
         }
-        else if ( default_magic_mark && setup )
-            magic_mark = 0x13371337;
-    }
 
+        if ( default_magic_mark )
+            magic_mark = 0;
+    }
+    else if ( default_magic_mark && setup )
+        magic_mark = 0x13371337;
+    
     if ( logfile )
     {
         out = open(logfile, O_RDWR|O_CREAT|O_APPEND, 0600);
@@ -508,7 +505,8 @@ int main(int argc, char** argv)
         goto done;
     }
 
-    afl_setup();
+    if ( !vmtrace )
+        afl_setup();
 
     if ( !afl && !vmtrace )
     {
@@ -523,12 +521,14 @@ int main(int argc, char** argv)
         printf("Fork VMs created: %u -> %u -> %u\n", domid, sinkdomid, fuzzdomid);
     }
 
-    input_file = NULL;
+    if ( !vmtrace ) {
+        input_file = NULL;
 
-    if ( !make_sink_ready() )
-    {
-        fprintf(stderr, "Seting up sinks on VM fork domid %u failed\n", sinkdomid);
-        goto done;
+        if ( !make_sink_ready() )
+        {
+            fprintf(stderr, "Seting up sinks on VM fork domid %u failed\n", sinkdomid);
+            goto done;
+        }
     }
 
     if ( !nocov && !ptcov && cs_open(CS_ARCH_X86, pm == VMI_PM_IA32E ? CS_MODE_64 : CS_MODE_32, &cs_handle) )
