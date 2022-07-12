@@ -44,6 +44,7 @@ extern bool debug;
 extern bool loopmode;
 extern bool nocov;
 extern bool ptcov;
+extern bool vmtrace;
 extern addr_t address;
 extern unsigned long limit;
 extern const char* record_codecov;

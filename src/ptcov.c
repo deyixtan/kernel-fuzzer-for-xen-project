@@ -154,7 +154,7 @@ bool decode_pt(void)
 
     memcpy(buf, pt_buf, size);
 
-    if ( debug )
+    if ( debug || vmtrace )
     {
         FILE *fp = fopen("buf", "w");
         fwrite(buf, size, 1, fp);

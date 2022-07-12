@@ -159,6 +159,31 @@ static bool fuzz(void)
     return ret;
 }
 
+static bool trace()
+{
+    if ( !fuzzdomid )
+        return false;
+
+    if ( xc_memshr_fork(xc, sinkdomid, fuzzdomid, true, true) )
+        return false;
+
+    if ( !start_trace(vmi, start_rip) ) {
+        return false;
+    }
+    
+    loop(vmi);
+    
+    if ( ptcov ) {
+        decode_pt();
+    }
+
+    teardown_sinks(vmi);
+    close_trace(vmi);
+    vmi_destroy(vmi);
+
+    return true;
+}
+
 static bool validate_flags()
 {
     if ( !domain && !domid )
@@ -166,6 +191,12 @@ static bool validate_flags()
         fprintf(stderr, "Must specify --domain OR --domid of parent VM\n");
         return false;
     }
+
+    if ( vmtrace )
+    {
+        return true;
+    }
+
     if ( !setup && ((!address == !extended_mark) || (!input_limit == !extended_mark)) )
     {
         fprintf(stderr, "Must exclusively specify either (--address AND --input-limit) of target buffer OR --extended-mark\n");
@@ -219,6 +250,12 @@ static void usage(void)
     printf("\t  -G  --fork-sig <unique string token used in naming forks>\n");
 
     printf("\n\n");
+    printf("Inputs required for VM processor tracing:\n");
+    printf("\t  -Z  --vmtrace\n");
+    printf("\tOptional inputs:\n");
+    printf("\t  -H  --harness cpuid|breakpoint (default is cpuid)\n");
+
+    printf("\n\n");
     printf("Optional global inputs:\n");
     printf("\t-v, --debug\n");
     printf("\t-F, --logfile <path to logfile>\n");
@@ -257,9 +294,10 @@ int main(int argc, char** argv)
         {"record-codecov", required_argument, NULL, 'R'},
         {"record-memaccess", required_argument, NULL, 'M'},
         {"fork-sig", required_argument, NULL, 'G'},
+        {"vmtrace", no_argument, NULL, 'Z'},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "d:i:j:f:a:l:F:H:S:m:n:V:P:R:M:G:svchtOKND";
+    const char* opts = "d:i:j:f:a:l:F:H:S:m:n:V:P:R:M:G:svchtOKNDZ";
     limit = ~0;
     unsigned long refork = 0;
     bool keep = false;
@@ -370,6 +408,12 @@ int main(int argc, char** argv)
             case 'G':
                 fork_sig = optarg;
                 break;
+            case 'Z':
+            {
+                vmtrace = true;
+                ptcov = true;
+                break;
+            }
             case 'h': /* fall-through */
             default:
                 usage();
@@ -383,20 +427,22 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    if ( !harness_cpuid )
+    if ( !vmtrace )
     {
-        if ( !start_byte )
+        if ( !harness_cpuid )
         {
-            printf("For breakpoint harness --start-byte with a value must be provided (NOP is always a good option, 0x90)\n");
-            return -1;
+            if ( !start_byte )
+            {
+                printf("For breakpoint harness --start-byte with a value must be provided (NOP is always a good option, 0x90)\n");
+                return -1;
+            }
+
+            if ( default_magic_mark )
+                magic_mark = 0;
         }
-
-        if ( default_magic_mark )
-            magic_mark = 0;
+        else if ( default_magic_mark && setup )
+            magic_mark = 0x13371337;
     }
-    else if ( default_magic_mark && setup )
-        magic_mark = 0x13371337;
-
 
     if ( logfile )
     {
@@ -464,7 +510,7 @@ int main(int argc, char** argv)
 
     afl_setup();
 
-    if ( !afl )
+    if ( !afl && !vmtrace )
     {
         input_file = fopen(input_path,"r"); // Sanity check
         if ( !input_file )
@@ -494,6 +540,11 @@ int main(int argc, char** argv)
     if ( !make_fuzz_ready() )
     {
         fprintf(stderr, "Seting up fuzzing on VM fork domid %u failed\n", fuzzdomid);
+        goto done;
+    }
+
+    if ( vmtrace ) {
+        trace();
         goto done;
     }
 
