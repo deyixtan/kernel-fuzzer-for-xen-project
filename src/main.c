@@ -164,7 +164,7 @@ static bool trace()
     if ( !fuzzdomid )
         return false;
 
-    if ( xc_memshr_fork(xc, sinkdomid, fuzzdomid, true, true) )
+    if ( xc_memshr_fork_reset(xc, fuzzdomid) )
         return false;
 
     if ( !start_trace(vmi, start_rip) ) {
