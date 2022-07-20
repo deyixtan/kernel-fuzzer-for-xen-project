@@ -45,12 +45,51 @@ static void usage(void)
     printf("\t --print-regs\n");
 }
 
-static bool print_instruction(vmi_instance_t _vmi, addr_t cr3, addr_t addr)
+bool prefix(const char *pre, const char *str)
+{
+    return strncmp(pre, str, strlen(pre)) == 0;
+}
+
+void
+vmi_print_hex1(
+    const unsigned char *data,
+    unsigned long length)
+{
+    unsigned long i, j, numrows, index;
+
+    numrows = (length + 15) >> 4;
+
+    for (i = 0; i < numrows; ++i) {
+        /* print the first 8 hex values */
+        for (j = 0; j < 8; ++j) {
+            index = i * 16 + j;
+            if (index < length) {
+                printf("%.2x ", data[index]);
+            } else {
+                printf("   ");
+            }
+        }
+        printf(" ");
+
+        /* print the second 8 hex values */
+        for (; j < 16; ++j) {
+            index = i * 16 + j;
+            if (index < length) {
+                printf("%.2x ", data[index]);
+            } else {
+                printf("   ");
+            }
+        }
+        printf("\n");
+    }
+}
+
+static bool print_instruction(vmi_instance_t _vmi, addr_t cr3, addr_t addr, x86_registers_t *regs)
 {
     unsigned char buf[15] = {0};
     cs_insn *insn = NULL;
     size_t read = 0, insn_count = 0;
-    const char *format = print_hex ? "%-40s\t" : "%s\n";
+    const char *format = print_hex ? "%s" : "%s\n";
     bool stop = false;
 
     ACCESS_CONTEXT(ctx,
@@ -64,11 +103,35 @@ static bool print_instruction(vmi_instance_t _vmi, addr_t cr3, addr_t addr)
     if ( read )
         insn_count = cs_disasm(cs_handle, buf, read, 0, 0, &insn);
 
-    printf("%5lu: %16lx  ", count, addr);
+    //printf("%5lu: %16lx  ", count, addr);
+    printf("%16lx;", addr);
 
     if ( insn_count )
     {
-        gchar *str = g_strconcat(insn[0].mnemonic, " ", insn[0].op_str, NULL);
+        gchar *str;
+        char operand_str[160];
+
+        if (strlen(insn[0].op_str) == 0)
+            strncpy(operand_str, " ", 160);
+        else
+            strncpy(operand_str, insn[0].op_str, 160);
+        
+        if (prefix("call", insn[0].mnemonic)) {
+            // relative offset
+            unsigned long ul_offset = strtoul(insn[0].op_str, NULL, 0);
+            // printf("relative offset in decimal: %ld\n", ul_offset);
+            // printf("destination addr: %016lx\n", ul_offset + regs->rip);
+            
+            char dest_str[256];
+            sprintf(dest_str, "%016lx", ul_offset + regs->rip);
+            //str = g_strconcat(insn[0].mnemonic, " ", insn[0].op_str, " (dest: ", dest_str, ")", NULL);
+            //str = g_strconcat(insn[0].mnemonic, " ", insn[0].op_str, NULL);
+            str = g_strconcat(insn[0].mnemonic, ";", operand_str, ";", NULL);
+        } else {
+            //str =
+             g_strconcat(insn[0].mnemonic, " ", insn[0].op_str, NULL);
+            str = g_strconcat(insn[0].mnemonic, ";", operand_str, ";", NULL);
+        }
 
         printf(format, str);
         g_free(str);
@@ -82,13 +145,19 @@ static bool print_instruction(vmi_instance_t _vmi, addr_t cr3, addr_t addr)
         else if ( insn[0].id == X86_INS_HLT )
             stop = true;
 
+        if ( print_hex ) {
+            vmi_print_hex1(buf, insn[0].size);
+            if (insn[0].size == 0) {
+                printf("ERROR\n");
+            }
+            //vmi_print_hex(buf, read);
+        }
+
         cs_free(insn, insn_count);
     }
     else
         printf(format, "-");
 
-    if ( print_hex )
-        vmi_print_hex(buf, read);
 
     return stop;
 }
@@ -118,7 +187,7 @@ static event_response_t tracer_cb(vmi_instance_t _vmi, vmi_event_t *event)
 
     count++;
 
-    bool stop = print_instruction(_vmi, event->x86_regs->cr3, event->x86_regs->rip);
+    bool stop = print_instruction(_vmi, event->x86_regs->cr3, event->x86_regs->rip, event->x86_regs);
     print_registers(event->x86_regs);
 
     if ( stop || count >= limit || event->x86_regs->rip == stop_rip )
@@ -226,7 +295,7 @@ int main(int argc, char** argv)
     {
         vmi_get_vcpuregs(vmi, &regs, 0);
 
-        print_instruction(vmi, regs.x86.cr3, regs.x86.rip);
+        print_instruction(vmi, regs.x86.cr3, regs.x86.rip, &regs.x86);
         print_registers(&regs.x86);
 
         vmi_toggle_single_step_vcpu(vmi, &singlestep_event, 0, 1);
