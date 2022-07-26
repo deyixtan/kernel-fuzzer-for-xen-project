@@ -80,7 +80,8 @@ vmi_print_hex1(
                 printf("   ");
             }
         }
-        printf("\n");
+        // printf("\n");
+        printf(";");
     }
 }
 
@@ -167,16 +168,16 @@ static void print_registers(x86_registers_t *regs)
     if ( !print_regs )
         return;
 
-    printf("\t\t RAX: 0x%016lx \t RBX: 0x%016lx\n", regs->rax, regs->rbx);
-    printf("\t\t RBP: 0x%016lx \t RSP: 0x%016lx\n", regs->rbp, regs->rsp);
-    printf("\t\t RDI: 0x%016lx \t RSI: 0x%016lx\n", regs->rdi, regs->rsi);
-    printf("\t\t RDX: 0x%016lx \t RCX: 0x%016lx\n", regs->rdx, regs->rcx);
-    printf("\t\t R8:  0x%016lx \t R9:  0x%016lx\n", regs->r8, regs->r9);
-    printf("\t\t R10: 0x%016lx \t R11: 0x%016lx\n", regs->r10, regs->r11);
-    printf("\t\t R12: 0x%016lx \t R13: 0x%016lx\n", regs->r12, regs->r13);
-    printf("\t\t R14: 0x%016lx \t R15: 0x%016lx\n", regs->r14, regs->r15);
-    printf("\t\t CR0: 0x%016lx \t CR2: 0x%016lx\n", regs->cr0, regs->cr2);
-    printf("\t\t CR3: 0x%016lx \t CR4: 0x%016lx\n", regs->cr3, regs->cr4);
+    printf("RAX=0x%016lx,RBX=0x%016lx,", regs->rax, regs->rbx);
+    printf("RBP=0x%016lx,RSP=0x%016lx,", regs->rbp, regs->rsp);
+    printf("RDI=0x%016lx,RSI=0x%016lx,", regs->rdi, regs->rsi);
+    printf("RDX=0x%016lx,RCX=0x%016lx,", regs->rdx, regs->rcx);
+    printf("R8=0x%016lx,R9=0x%016lx,", regs->r8, regs->r9);
+    printf("R10=0x%016lx,R11=0x%016lx,", regs->r10, regs->r11);
+    printf("R12=0x%016lx,R13=0x%016lx,", regs->r12, regs->r13);
+    printf("R14=0x%016lx,R15=0x%016lx,", regs->r14, regs->r15);
+    printf("CR0=0x%016lx,CR2=0x%016lx,", regs->cr0, regs->cr2);
+    printf("CR3=0x%016lx,CR4=0x%016lx\n", regs->cr3, regs->cr4);
 }
 
 static event_response_t tracer_cb(vmi_instance_t _vmi, vmi_event_t *event)
